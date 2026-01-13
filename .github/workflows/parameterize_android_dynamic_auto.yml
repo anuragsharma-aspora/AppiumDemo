@@ -67,7 +67,7 @@ jobs:
             "https://api.github.com/repos/Vance-Club/vance-android/actions/runs/$RUN_ID/artifacts" \
             | jq -r --arg type "$APP_TYPE" --arg version "$APP_VERSION" '
                 .artifacts
-                | map(select(.name | startswith("app-" + $type + "-" + $version)))
+                | map(select(.name | startswith("app-" + $type + "-")))
                 | sort_by(.created_at)
                 | reverse
                 | .[0].id
