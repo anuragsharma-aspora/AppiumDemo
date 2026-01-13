@@ -27,7 +27,7 @@ jobs:
             "https://api.github.com/repos/Vance-Club/vance-android/actions/artifacts" \
             | jq -r '
               .artifacts
-              | map(select(.name=="develop-debug-apk"))
+              | map(select(.name | startswith("app-debug-")))
               | sort_by(.created_at)
               | reverse
               | .[0].id
