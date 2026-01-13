@@ -1,0 +1,53 @@
+name: Automation Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout automation repo
+        uses: actions/checkout@v4
+
+      - name: Get latest develop build artifact ID
+        id: artifact
+        run: |
+          ARTIFACT_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://github.com/Vance-Club/vance-android/actions/artifacts" \
+            | jq -r '
+              .artifacts
+              | map(select(.name=="develop-debug-apk"))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
+
+          if [ "$ARTIFACT_ID" = "null" ] || [ -z "$ARTIFACT_ID" ]; then
+            echo "No artifact found"
+            exit 1
+          fi
+
+          echo "artifact_id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+
+      - name: Download APK artifact
+        run: |
+          curl -L \
+            -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://github.com/Vance-Club/vance-android/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip" \
+            -o android-apk.zip
+
+      - name: Extract APK
+        run: |
+          unzip android-apk.zip -d android-apk
+          ls android-apk
+
+      - name: Upload APK for reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-apk
+          path: android-apk/app-debug.apk
