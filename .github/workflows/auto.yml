@@ -17,7 +17,7 @@ jobs:
           ARTIFACT_ID=$(curl -s \
             -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
             -H "Accept: application/vnd.github+json" \
-            "https://github.com/Vance-Club/vance-android/actions/artifacts" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/artifacts" \
             | jq -r '
               .artifacts
               | map(select(.name=="develop-debug-apk"))
@@ -38,7 +38,7 @@ jobs:
           curl -L \
             -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
             -H "Accept: application/vnd.github+json" \
-            "https://github.com/Vance-Club/vance-android/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip" \
             -o android-apk.zip
 
       - name: Extract APK
