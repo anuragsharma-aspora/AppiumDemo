@@ -11,6 +11,13 @@ jobs:
       - name: Checkout automation repo
         uses: actions/checkout@v4
 
+      - name: List artifacts from API
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/artifacts" \
+            | jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at}'
+
       - name: Get latest develop build artifact ID
         id: artifact
         run: |
