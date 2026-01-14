@@ -141,28 +141,29 @@ jobs:
           echo "$BODY"
 
           if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 201 ]; then
-            MAGIC_LINK=$(echo "$BODY" | jq -r '.magicLink // empty')
-            VERSIONED_LINK=$(echo "$BODY" | jq -r '.versionedMagicLink // empty')
-            NB_VERSION=$(echo "$BODY" | jq -r '.version // empty')
-            APP_ID=$(echo "$BODY" | jq -r '.id // empty')
-
+            MAGIC_LINK=$(echo "$BODY" | jq -r '.data.magicLink // empty')
+            VERSIONED_LINK=$(echo "$BODY" | jq -r '.data.versionedMagicLink // empty')
+            NB_VERSION=$(echo "$BODY" | jq -r '.data.version // empty')
+            APP_ID=$(echo "$BODY" | jq -r '.data.id // empty')
+            
             if [ -z "$MAGIC_LINK" ]; then
-              echo "Magic link missing in response"
-              exit 1
+            echo "Magic link missing in response"
+            exit 1
             fi
-
+            
             echo "NATIVEBRIDGE_LINK=$MAGIC_LINK" >> $GITHUB_ENV
             echo "NATIVEBRIDGE_VERSIONED_LINK=$VERSIONED_LINK" >> $GITHUB_ENV
             echo "NATIVEBRIDGE_VERSION=$NB_VERSION" >> $GITHUB_ENV
             echo "NATIVEBRIDGE_APP_ID=$APP_ID" >> $GITHUB_ENV
-
+            
             echo "magic_link=$MAGIC_LINK" >> $GITHUB_OUTPUT
             echo "versioned_link=$VERSIONED_LINK" >> $GITHUB_OUTPUT
             echo "nb_version=$NB_VERSION" >> $GITHUB_OUTPUT
             echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
-
+            
             echo "✅ NativeBridge upload successful"
-          else
+            else
             echo "❌ NativeBridge upload failed"
             exit 1
-          fi
+            fi
+
