@@ -1,0 +1,159 @@
+name: End to End pipe NativeBridge included
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Android repo branch to fetch'
+        default: 'develop'
+        required: true
+      app_version:
+        description: 'Version of the app'
+        default: '1.0.0'
+        required: true
+      app_type:
+        description: 'Type of app (debug or release)'
+        default: 'debug'
+        required: true
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout automation repo
+      - name: Checkout automation repo
+        uses: actions/checkout@v4
+
+      # Step 2: Print inputs
+      - name: Print workflow inputs
+        run: |
+          echo "Branch: ${{ github.event.inputs.branch }}"
+          echo "App Version: ${{ github.event.inputs.app_version }}"
+          echo "App Type: ${{ github.event.inputs.app_type }}"
+
+      # Step 3: Get latest successful workflow run for the branch
+      - name: Get latest workflow run for branch
+        id: get_run
+        run: |
+          BRANCH="${{ github.event.inputs.branch }}"
+          echo "Fetching latest successful workflow run for branch: $BRANCH"
+
+          RUN_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/runs?branch=$BRANCH&status=success" \
+            | jq -r '.workflow_runs[0].id')
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "No successful workflow run found for branch $BRANCH"
+            exit 1
+          fi
+
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "Latest run ID: $RUN_ID"
+
+      # Step 4: Get artifact ID from that run
+      - name: Get APK artifact ID
+        id: get_artifact
+        run: |
+          APP_TYPE="${{ github.event.inputs.app_type }}"
+          APP_VERSION="${{ github.event.inputs.app_version }}"
+          RUN_ID="${{ steps.get_run.outputs.run_id }}"
+
+          echo "Fetching latest $APP_TYPE APK from run $RUN_ID"
+
+          ARTIFACT_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/runs/$RUN_ID/artifacts" \
+            | jq -r --arg type "$APP_TYPE" --arg version "$APP_VERSION" '
+                .artifacts
+                | map(select(.name | startswith("app-" + $type + "-")))
+                | sort_by(.created_at)
+                | reverse
+                | .[0].id
+              ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "No artifact found for $APP_TYPE APK with version $APP_VERSION"
+            exit 1
+          fi
+
+          echo "artifact_id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+          echo "Found artifact ID: $ARTIFACT_ID"
+
+      # Step 5: Download the APK artifact
+      - name: Download APK artifact
+        run: |
+          ARTIFACT_ID="${{ steps.get_artifact.outputs.artifact_id }}"
+
+          curl -L \
+            -H "Authorization: token ${{ secrets.ANDROID_REPO_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Vance-Club/vance-android/actions/artifacts/$ARTIFACT_ID/zip" \
+            -o android-apk.zip
+
+      # Step 6: Extract APK
+      - name: Extract APK
+        run: |
+          unzip android-apk.zip -d android-apk
+          echo "APK contents:"
+          ls android-apk
+
+      - name: Upload APK for reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-apk
+          path: android-apk/*.apk
+
+      - name: Upload APK to NativeBridge
+        if: github.ref_name == 'dev' || contains(github.event.head_commit.message, 'native bridge')
+        id: nativebridge_upload
+        env:
+          NATIVEBRIDGE_API_KEY: ${{ secrets.NATIVEBRIDGE_API_KEY }}
+        run: |
+          APK_PATH=$(find android-apk -name "*.apk" | head -n 1)
+
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ APK not found"
+            exit 1
+          fi
+
+          echo "Uploading APK from: $APK_PATH"
+
+          if [ -z "$NATIVEBRIDGE_API_KEY" ]; then
+            echo "NativeBridge API key not set, skipping upload"
+            exit 0
+          fi
+
+          RESPONSE=$(curl -X POST https://api.nativebridge.io/v1/application \
+            -H "X-Api-Key: $NATIVEBRIDGE_API_KEY" \
+            -F "file=@$APK_PATH" \
+            -F "accessType=public" \
+            -F "versionAction=create_new_version" \
+            -F "sendNotification=true" \
+            -w "\n%{http_code}" \
+            -s)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            MAGIC_LINK=$(echo "$BODY" | grep -o '"magicLink":"[^"]*"' | sed 's/"magicLink":"//;s/"//')
+            VERSIONED_LINK=$(echo "$BODY" | grep -o '"versionedMagicLink":"[^"]*"' | sed 's/"versionedMagicLink":"//;s/"//')
+            NB_VERSION=$(echo "$BODY" | grep -o '"version":"[^"]*"' | sed 's/"version":"//;s/"//')
+            APP_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | sed 's/"id":"//;s/"//')
+
+            echo "NATIVEBRIDGE_LINK=$MAGIC_LINK" >> $GITHUB_ENV
+            echo "NATIVEBRIDGE_VERSIONED_LINK=$VERSIONED_LINK" >> $GITHUB_ENV
+            echo "NATIVEBRIDGE_VERSION=$NB_VERSION" >> $GITHUB_ENV
+            echo "NATIVEBRIDGE_APP_ID=$APP_ID" >> $GITHUB_ENV
+
+            echo "magic_link=$MAGIC_LINK" >> $GITHUB_OUTPUT
+            echo "versioned_link=$VERSIONED_LINK" >> $GITHUB_OUTPUT
+            echo "nb_version=$NB_VERSION" >> $GITHUB_OUTPUT
+            echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
+          else
+            echo "NativeBridge upload failed"
+            echo "$BODY"
+            exit 1
+          fi
