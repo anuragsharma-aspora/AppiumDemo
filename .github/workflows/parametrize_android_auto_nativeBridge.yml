@@ -13,8 +13,12 @@ on:
         required: true
       app_type:
         description: 'Type of app (debug or release)'
-        default: 'debug'
         required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
       upload_to_nativebridge:
         description: 'Upload APK to NativeBridge'
         type: boolean
@@ -35,6 +39,7 @@ jobs:
           echo "Branch: ${{ github.event.inputs.branch }}"
           echo "App Version: ${{ github.event.inputs.app_version }}"
           echo "App Type: ${{ github.event.inputs.app_type }}"
+          echo "NativeBridge added": ${{ github.event.inputs.upload_to_nativebridge }}
 
       # Step 3: Get latest successful workflow run for the branch
       - name: Get latest workflow run for branch
