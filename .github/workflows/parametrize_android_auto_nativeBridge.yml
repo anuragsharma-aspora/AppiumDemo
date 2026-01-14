@@ -118,16 +118,11 @@ jobs:
           APK_PATH=$(find android-apk -name "*.apk" | head -n 1)
 
           if [ -z "$APK_PATH" ]; then
-            echo "❌ APK not found"
+            echo "APK not found"
             exit 1
           fi
 
           echo "Uploading APK from: $APK_PATH"
-
-          if [ -z "$NATIVEBRIDGE_API_KEY" ]; then
-            echo "NativeBridge API key not set, skipping upload"
-            exit 0
-          fi
 
           RESPONSE=$(curl -X POST https://api.nativebridge.io/v1/application \
             -H "X-Api-Key: $NATIVEBRIDGE_API_KEY" \
@@ -141,11 +136,20 @@ jobs:
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            MAGIC_LINK=$(echo "$BODY" | grep -o '"magicLink":"[^"]*"' | sed 's/"magicLink":"//;s/"//')
-            VERSIONED_LINK=$(echo "$BODY" | grep -o '"versionedMagicLink":"[^"]*"' | sed 's/"versionedMagicLink":"//;s/"//')
-            NB_VERSION=$(echo "$BODY" | grep -o '"version":"[^"]*"' | sed 's/"version":"//;s/"//')
-            APP_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | sed 's/"id":"//;s/"//')
+          echo "HTTP_CODE=$HTTP_CODE"
+          echo "Response body:"
+          echo "$BODY"
+
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 201 ]; then
+            MAGIC_LINK=$(echo "$BODY" | jq -r '.magicLink // empty')
+            VERSIONED_LINK=$(echo "$BODY" | jq -r '.versionedMagicLink // empty')
+            NB_VERSION=$(echo "$BODY" | jq -r '.version // empty')
+            APP_ID=$(echo "$BODY" | jq -r '.id // empty')
+
+            if [ -z "$MAGIC_LINK" ]; then
+              echo "Magic link missing in response"
+              exit 1
+            fi
 
             echo "NATIVEBRIDGE_LINK=$MAGIC_LINK" >> $GITHUB_ENV
             echo "NATIVEBRIDGE_VERSIONED_LINK=$VERSIONED_LINK" >> $GITHUB_ENV
@@ -156,8 +160,9 @@ jobs:
             echo "versioned_link=$VERSIONED_LINK" >> $GITHUB_OUTPUT
             echo "nb_version=$NB_VERSION" >> $GITHUB_OUTPUT
             echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
+
+            echo "✅ NativeBridge upload successful"
           else
-            echo "NativeBridge upload failed"
-            echo "$BODY"
+            echo "❌ NativeBridge upload failed"
             exit 1
           fi
