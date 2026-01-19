@@ -165,3 +165,13 @@ jobs:
 
       - name: Run Appium tests
         run: mvn test
+
+
+      - name: Print Surefire reports
+        if: failure()
+        run: |
+          echo "=== Surefire Reports ==="
+          ls -R target/surefire-reports
+          echo "=== Test Output ==="
+          cat target/surefire-reports/*.txt || true
+          cat target/surefire-reports/*.xml || true
