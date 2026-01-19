@@ -155,3 +155,7 @@ jobs:
         run: |
           echo "### NativeBridge Session Started" >> $GITHUB_STEP_SUMMARY
           echo "**Session URL:** [${{ env.SESSION_URL }}](${{ env.SESSION_URL }})" >> $GITHUB_STEP_SUMMARY
+          
+
+      - name: Run Appium tests
+        run: mvn test
