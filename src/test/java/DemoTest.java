@@ -1,19 +1,18 @@
-package demo;
-
 import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.options.UiAutomator2Options;
 import io.appium.java_client.remote.AutomationName;
 import org.openqa.selenium.By;
+import org.testng.annotations.Test;
 
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
-import java.time.Duration;
 
-public class test {
+public class DemoTest {
 
-    public static void main(String[] args) throws MalformedURLException {
+    @Test
+    public void verifyFlow() throws MalformedURLException {
+
         AppiumDriver driver;
 
         UiAutomator2Options uiAutomator2Options = new UiAutomator2Options();
@@ -45,6 +44,7 @@ public class test {
                 uiAutomator2Options
         );
 
+        //driver.findElement(By.xpath("")).click();
 
         driver.findElement(By.xpath("//android.widget.TextView[contains(@resource-id,\"tv_country_name\") and @text=\"UAE\"]")).click();
 
@@ -60,6 +60,5 @@ public class test {
         driver.findElement(By.xpath("//android.widget.EditText[contains(@resource-id,\"otp_input_view\")]")).sendKeys("001234");
 
         try{Thread.sleep(10000);}catch(Exception e){}
-
     }
 }
